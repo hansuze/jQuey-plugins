@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <title>stickup</title>
+    <style>
+      html {
+        font-size: 24px;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+
+      #header{
+        height: 100px;
+
+        line-height: 100px;
+        text-align: center;
+
+        background: #e83838;
+      }
+
+      #content{
+        height: 1500px;
+        padding: 10px;
+        background: #ccc;
+      }
+
+      .clear:after{
+        content: "";
+        display: block;
+        height: 0;
+        clear: both;
+      }
+
+      .nav{
+        height: 60px;
+        margin-top:20px;
+        background: blue;
+      }
+
+      #content .aside{
+        float:left;
+
+        height:100%;
+        width: 100px;
+
+        background: green;
+      }
+
+      #content .main{
+        margin: 0;
+        margin-left: 120px;
+        padding: 0;
+        padding-left: 20px;
+        height: 100%;
+      }
+
+      #footer{
+        height: 60px;
+
+        text-align: center;
+
+        color: #fff;
+        background-color: #1b1b1b;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="header">header</div>
+    <div class="nav">nav</div>
+    <div class="clear" id="content">
+      <div class="aside">aside</div>
+      <div class="main">main</div>
+    </div>
+    <div id="footer">footer</div>
+    <script>
+
+      var Stickup = function($target) {
+        this.init($target);
+        this.bind();
+      }
+
+      Stickup.prototype = {
+        init: function($target) {
+          this.$target = $target;
+          this.upperline = $target.offset().top;
+          this.targetWidth = $target.width();
+          this.targetHeight = $target.height();
+          this.$targetClone = $target.clone();
+          this.$targetClone.hide().insertBefore($target);
+        },
+
+        bind: function() {
+          var _self = this;
+
+          $(window).on('scroll', function() {
+            if (_self.upperline < $(this).scrollTop()) {
+              if (!_self.isFixed()) {
+                _self.setFixed();
+              }
+
+            } else {
+              _self.unsetFixed();
+            }
+
+          });
+
+        },
+
+        isFixed: function() {
+          return this.$target.data('fixed');
+        },
+
+        setFixed: function() {
+          this.$target.data('fixed', true);
+
+          this.$target.css({
+            position: 'fixed',
+            left: this.$targetClone.offset().left,
+            top: 0,
+            width: this.targetWidth,
+            height: this.targetHeight,
+            margin: 0,
+            'z-index': 999
+          });
+
+          this.$targetClone.show();
+        },
+
+        unsetFixed: function() {
+          this.$target.removeData('fixed');
+          this.$targetClone.hide();
+          this.$target.removeAttr('style');
+        }
+      };
+
+      $.fn.stickup = function() {
+        $(this).each(function() {
+          new Stickup($(this));
+        });
+
+        return $(this);
+      };
+
+      $('.nav').stickup();
+
+   </script>
+  </body>
+</html>

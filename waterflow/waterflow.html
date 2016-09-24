@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>waterflow</title>
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <style>
+      ul,
+      li {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+      }
+
+      .waterflow .container {
+        position: relative;
+      }
+
+      .waterflow .container > .item {
+        position: absolute;
+
+        border: 1px solid #ccc;
+        border-radius: 5px;
+
+        margin: 10px;
+        margin-bottom: 0;
+        padding: 7px;
+        width:260px;
+
+        transition: .3s left, top;
+        visibility:hidden;
+      }
+
+      .waterflow .container>.item img {
+        width: 100%;
+      }
+
+      .waterflow .exposure {
+        visibility: hidden;
+        overflow: hidden;
+
+        margin: 0 auto;
+        width: 100px;
+        height: 100px;
+
+        text-indent: 200%;
+
+        background: url(image/loader.png);
+
+        animation: 1s loader steps(8) infinite;
+        animation-play-state: paused;
+      }
+
+      .waterflow .exposure.loader {
+        visibility: visible;
+
+        animation-play-state: running;
+      }
+
+      @keyframes loader {
+        to {background-position: -800px;}
+      }
+    </style>
+  </head>
+  <body>
+    <div class="waterflow">
+      <ul class="container">
+      </ul>
+      <div class="exposure">load</div>
+    </div>
+    <script>
+    // 节流函数
+    var throttleFactory = function(Fn, timer) {
+      var clock = null,
+          timer = timer || 200;
+
+      return function() {
+        var _self = this;
+            args = arguments;
+
+        if (clock) {
+          clearTimeout(clock);
+        }
+
+        clock = setTimeout(function() {
+          Fn.apply(_self, args);
+        }, timer);
+
+      };
+
+    };
+
+    var Waterflow = function($target) {
+      this.init($target);
+      this.bind();
+      this.addItems();
+    }
+
+    Waterflow.prototype = {
+      init: function($target) {
+        this.colHeight = [];
+        this.$container = $target.find('.container');
+        this.$exposure = $target.children('.exposure')
+        this.minSize = 3;   //最小行数
+        this.itemWidth = 0;
+        this.curPage = 1;
+        this.num = 20;
+      },
+
+      bind: function() {
+        var _self = this;
+
+
+        $(window).on('resize', throttleFactory(function() {
+          _self.resize();
+        }, 300));
+
+        $(window).on('scroll', throttleFactory(function() {
+          if (_self.isExposure(_self.$exposure)) {
+            _self.addItems();
+          }
+
+        }, 300));
+
+      },
+
+      // 计算列数当列数改变时重绘页面
+      resize: function() {
+        var newSize;
+
+        if (!this.itemWidth) {
+          return;
+        }
+        newSize = Math.floor(this.$container.width() / this.itemWidth);
+        newSize = Math.max(newSize, this.minSize);
+
+        // 如果列数和以前一样则不用重绘
+        if (newSize === this.colHeight.length) {
+          return;
+        }
+
+        this.initColum();
+        this.render(this.$container.children('.item'));
+      },
+
+      addItems: function() {
+        this.$exposure.addClass('loader');
+        this.getData(this.load, this);
+      },
+
+      initColum: function() {
+        var size,
+            colHeight = [];
+
+        // 初始化 itemWidth
+        if (!this.itemWidth) {
+          this.itemWidth = this.$container.children('.item').outerWidth(true);
+        }
+
+        size = Math.floor(this.$container.width() / this.itemWidth);
+        size = Math.max(this.minSize, size);
+        for(var i = 0; i < size; i++) {
+          colHeight.push(0);
+        }
+
+        this.colHeight = colHeight;
+      },
+
+      //jsonp
+      getData: function(handler, context){
+        $.ajax({
+          url: 'http://platform.sina.com.cn/slide/album_tech',
+          method: 'get',
+          dataType: 'jsonp',
+          jsonp: 'jsoncallback',
+          data: {
+            app_key: 1271687855,
+            page: this.curPage,
+            num: this.num
+          }
+        }).done(function(ret) {
+            if (ret && ret.status && +ret.status.code === 0) {
+              handler && handler.call(context, ret.data || []);
+            } else {
+              console.error('error:'+ret);
+            }
+
+        });
+
+        this.curPage++;
+      },
+
+      appendNodes: function(data) {
+        var html = "",
+            $nodes;
+
+        if (data && data.length > 0) {
+          data.forEach(function(child) {
+            html+='<li class="item"';
+            html+='<a href="'+child.url+'">';
+            html+='<img src="' + child.img_url + '" />';
+            html+='<div class="news-word">';
+            html+='<h3 class="news-short">' + child.short_name + '</h3>';
+            html+='<hr>';
+            html+='<p class="news-intro">' +  child.short_intro + '</p>';
+            html+='<p class="news-date">' + child.createtime + '</p>';
+            html+='<p class="news-sour">来源:' + child.source + '</p>'
+            html+='</div>';
+            html+= '</a>';
+            html+='</li>';
+          });
+
+          $nodes = $(html);
+          this.$container.append($nodes);
+          return $nodes;
+          }
+        },
+
+        isExposure: function($el) {
+          var winH = $(window).height(),
+              scrollH = $(window).scrollTop(),
+              offsetTop = $el.offset().top;
+
+          if (offsetTop < winH + scrollH){
+            return true;
+          }
+
+          return false;
+        },
+
+        // 图片加载完再render
+        load: function(data) {
+        var $nodes = this.appendNodes(data),
+            deferreds = [],
+            _self = this;
+
+          if (this.colHeight.length === 0) {
+            this.initColum();
+          }
+
+          $nodes.find('img').each(function() {
+            var deferred = $.Deferred();
+
+            $(this).on('load', function(){
+              deferred.resolve();
+            });
+
+            deferreds.push(deferred);
+          });
+
+          $.when.apply(null, deferreds).done(function() {
+            _self.render($nodes);
+            _self.$exposure.removeClass('loader');
+          });
+        },
+
+        render: function($nodes) {
+          var _self = this;
+
+          $nodes.each(function() {
+            minHeightCol = _self.getMinHeightCol(_self.colHeight);
+
+            $(this).css({
+              left: minHeightCol.idx * _self.itemWidth,
+              top: minHeightCol.min,
+              visibility:'visible'
+            });
+
+            _self.colHeight[minHeightCol.idx] += $(this).outerHeight(true);
+          });
+
+          this.$container.height(Math.max.apply(null,this.colHeight));
+        },
+
+        getMinHeightCol: function(columns) {
+          var minHeight = columns[0],
+              columnIdx = 0;
+
+           columns.forEach(function(val, idx) {
+            if (minHeight > val) {
+              columnIdx = idx;
+              minHeight = val;
+            }
+
+          });
+
+          return {idx: columnIdx, min: minHeight};
+        }
+      };
+
+      $.fn.waterflow = function() {
+        $(this).each(function() {
+          new Waterflow($(this));
+        });
+
+        return $(this);
+      };
+
+      $('.waterflow').waterflow();
+
+    </script>
+  </body>
+</html>

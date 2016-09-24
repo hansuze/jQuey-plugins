@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <title>3D轮播</title>
+  </head>
+  <body>
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          ul,
+          li {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+          }
+
+          .carousel-ct {
+            margin: 0 auto;
+            min-width: 900px;  /* 设置轮播容器的最小宽度*/
+          }
+
+          .carousel {
+            position: relative;
+            margin: 0 auto;
+            width: 700px;
+            height: 180px;
+
+            transform-style: preserve-3d;
+            perspective: 1000px;
+
+            /*transform: rotateX(45deg);*/
+
+          }
+
+          .carousel .img-ct > li {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+
+            transition: 1s  ease;
+          }
+
+          .carousel .img-ct > li a,
+          .carousel .img-ct > li img {
+            display: block;
+            height: 100%;
+          }
+
+          .carousel .bullet {
+            position: absolute;
+            left: 50%;
+            bottom: 20px;
+            z-index: 6;
+
+            transform: translateX(-50%);
+
+            cursor: default;
+          }
+
+          .carousel .bullet > li {
+            display: inline-block;
+            overflow: hidden;
+
+            position: relative;
+
+            border: 1px solid rgba(0, 0, 0, .2);
+            border-radius: 50%;
+            width: 8px;
+            height: 8px;
+
+            background: #eee;
+            visibility: visible;
+
+            cursor: pointer;
+          }
+
+          .carousel .bullet > li.active {
+            background: #2196F3;
+          }
+
+        </style>
+        <title>3D旋转木马</title>
+      </head>
+      <body>
+        <div class="carousel-ct">
+          <div class="carousel">
+            <ul class="img-ct">
+              <li><a href="javascript:;;;"><img src="image/1.jpg"></a></li>
+              <li><a href="javascript:;;;"><img src="image/2.jpg"></a></li>
+              <li><a href="javascript:;;;"><img src="image/3.jpg"></a></li>
+              <li><a href="javascript:;;;"><img src="image/4.jpg"></a></li>
+              <li><a href="javascript:;;;"><img src="image/5.jpg"></a></li>
+            </ul>
+            <ul class="bullet">
+              <li></li>
+              <li></li>
+              <li></li>
+              <li></li>
+              <li></li>
+            </ul>
+          </div>
+        </div>
+        <script>
+          // 节流函数
+          var throttleFactory = function(Fn, timer) {
+            var clock = null,
+                firstTime = true,
+                timer = timer || 200;
+
+            return function() {
+              var _self = this;
+                  args = arguments;
+
+              // 第一次执行时不节流
+              if (firstTime) {
+                firstTime = false;
+                Fn.apply(_self, args);
+                return;
+              }
+
+              if (clock) {
+                clearTimeout(clock);
+              }
+
+              clock = setTimeout(function() {
+                Fn.apply(_self, args);
+              }, timer);
+
+            };
+
+          };
+
+          var Carousel = function($target) {
+            this.init($target);
+            this.bind();
+            this.show();
+          }
+
+          Carousel.prototype = {
+            init: function($target) {
+              this.$carousel = $target;
+              this.$imgContainer = $target.find('.img-ct');
+              this.$imgList = this.$imgContainer.children('li');
+              this.cssX = 0;
+              this.cssXout = 0;
+              this.minLength = 5;
+              this.$bullets = $target.find('.bullet');
+              this.clock = null;
+              this.timer = 3000;       // 单位:ms
+              this.curIdx = 0;
+              this.animateQueue = [];   // 播放时的css顺序
+              this.setVal();
+              this.showBullet();
+            },
+
+            setVal: function() {
+              this.invisiableAry = [];  // 当图片大于5时剩余图片存入这里
+              this.deviation = 200;   // 单位:px
+              this.resize();  // 更新偏移量
+              this.initPos();
+              this.render();
+            },
+
+            initPos: function() {
+              var orderList = [],
+                  $image,
+                  imgListCopy = this.$imgList.slice(0);
+
+              if (this.minLength  === imgListCopy.length) {
+                orderList = imgListCopy;
+              } else if (this.minLength < this.$imgList.length) {
+                // 前面取5个
+                orderList = orderList.concat(imgListCopy.splice(0,this.minLength));
+                this.invisiableAry = [].concat(imgListCopy);
+              }
+
+              for (var key in this.animates) {
+                $image = $(orderList.splice(0, 1));
+                $image.attr('pos', key);
+
+                this.animateQueue.push(key);
+              }
+            },
+
+            resize: function() {
+              var _self = this,
+                  posName;
+
+              this.updateWidth();
+              this.animates = _self.getAnimation();
+
+            },
+
+            render: function() {
+              var posName,
+                  _self = this;
+
+              this.$imgList.each(function() {
+                posName = $(this).attr('pos');
+
+                if (posName in _self.animates) {
+                  $(this).css(_self.animates[posName]);
+                } else {
+                  $(this).css(_self.invisableCss).attr('pos', 'invisiable');
+                }
+
+              });
+
+            },
+
+            bind: function() {
+              var _self = this;
+
+              this.$bullets.on('click', 'li', function() {
+                _self.removeClock(); // 手动点击清除定时器，等到动画执行后再加上
+                _self.playIdx( $(this).index());
+              });
+
+              this.$imgList.on('click', function() {
+                _self.removeClock(); // 手动点击清除定时器，等到动画执行后再加上
+                _self.clickImg($(this).attr('pos'));
+              });
+
+              $(window).on('resize', throttleFactory(function() {
+                _self.removeClock();
+                _self.resize();
+                _self.render();
+                _self.addClock();
+              }, 100));
+
+            },
+
+            show: function() {
+              this.autoPlay();
+            },
+
+            autoPlay: function() {
+              this.addClock();
+            },
+
+            addClock: function() {
+              var _self = this;
+
+              if (this.clock) {
+                return;
+              }
+
+              this.clock = setInterval(function() {
+                _self.playNext();
+              }, this.timer);
+
+            },
+
+            removeClock: function() {
+              clearInterval(this.clock);
+              this.clock = null;
+            },
+
+            playPrev: function(num) {
+              var num = num || 1,
+                  _self = this,
+                  nextKey;
+
+              this.curIdx= (this.$imgList.length + this.curIdx - num) % this.$imgList.length;
+              this.showBullet();
+              if (this.invisiableAry.length === 0) {
+                this.$imgList.each(function() {
+                  nextKey = _self.getPrevKey($(this).attr('pos'), num);
+                  $(this).attr('pos', nextKey);
+                });
+
+              } else { // 当图片数量大于5
+                playOrder = this.getPrevOrder(num);
+                playOrder.forEach(function(item) {
+                  nextKey = _self.getPrevKey($(item).attr('pos'), num);
+                  $(item).attr('pos', nextKey);
+                });
+
+              }
+
+              this.render();
+              this.addClock();
+            },
+
+            playNext: function(num, isDone) {
+              var num = num || 1,
+                  _self = this,
+                  nextKey,
+                  playOrder;
+              this.curIdx = (this.curIdx + num) % this.$imgList.length;
+              this.showBullet();
+              if (this.invisiableAry.length === 0) {
+                this.$imgList.each(function() {
+                  nextKey = _self.getNextKey($(this).attr('pos'), num);
+                  $(this).attr('pos', nextKey);
+                });
+
+              } else { // 当图片数量大于5
+                playOrder = this.getNextOrder(num);
+                playOrder.forEach(function(item) {
+                  nextKey = _self.getNextKey($(item).attr('pos'), num);
+                  $(item).attr('pos', nextKey);
+                });
+
+                playOrder.forEach(function(item) {
+                });
+
+              }
+
+              this.render();
+              this.addClock();
+            },
+
+            playIdx: function(nextIdx) {
+              var loop,
+                  _self = this;
+
+              if (this.curIdx > nextIdx) {
+                this.playPrev(this.curIdx - nextIdx);
+              }
+
+              if (this.curIdx < nextIdx) {
+                this.playNext(nextIdx - this.curIdx);
+
+              }
+
+            },
+
+            clickImg: function(targetPos) {
+              var nextIdx = this.animateQueue.indexOf('center'),
+                  targetIdx = this.animateQueue.indexOf(targetPos);
+
+              if (targetIdx < nextIdx) {
+                this.playNext(nextIdx - targetIdx);
+              }
+
+              if (targetIdx > nextIdx) {
+                this.playPrev(targetIdx - nextIdx);
+              }
+
+            },
+
+            // 当元素超过5个时, 需要先生成一个顺序再移动
+            getPrevOrder: function(step) {
+              var orderList = [],
+                  posCache,
+                  $hiddenItem,
+                  $showItem,
+                  _self = this;
+
+              // 获得现有展示的顺序
+              this.animateQueue.forEach(function(key) {
+                orderList.push(_self.$imgContainer.find('li[pos="'+ key +'"]'));
+              });
+
+              // 从现有展示顺序前面shift() 放到 invisiableAry的前面 ,
+              // 然后再从 invisiableAry的后面拿出pop() 放到 orderList的后面push()
+              for(var i = 0; i < step; i++) {
+                $hiddenItem = orderList.shift();
+                posCache = $hiddenItem.attr('pos');
+                $hiddenItem.attr('pos', 'visiable');
+                this.invisiableAry.unshift($hiddenItem);
+                $showItem = this.invisiableAry.pop();
+                $showItem.attr('pos', posCache);
+                orderList.push($showItem);
+              }
+
+              return orderList;
+            },
+
+            // 当元素超过5个时, 需要先生成一个顺序再移动
+            getNextOrder: function(step) {
+              var orderList = [],
+                  posCache,
+                  $hiddenItem,
+                  $showItem,
+                  _self = this;
+
+                // 获得现有展示的顺序
+                this.animateQueue.forEach(function(key) {
+                  orderList.push(_self.$imgContainer.find('li[pos="'+ key +'"]'));
+                });
+
+              // 从现有展示顺序后面pop() 放到 invisiableAry的后面push() ,
+              // 然后再从 invisiableAry的前面拿出shift() 放到 orderList的前面unshift()
+              for(var i = 0; i < step; i++) {
+                $hiddenItem = orderList.pop();
+                posCache = $hiddenItem.attr('pos');
+                $hiddenItem.attr('pos', 'visiable');
+                this.invisiableAry.push($hiddenItem);
+                $showItem = this.invisiableAry.shift();
+                $showItem.attr('pos', posCache);
+                orderList.unshift($showItem);
+              }
+
+              return orderList;
+            },
+
+            getPrevKey: function(key, step) {
+              var curIdx = this.animateQueue.indexOf(key),
+                  nextKey= (this.animateQueue.length + curIdx - step) % this.animateQueue.length;
+
+              return this.animateQueue[nextKey];
+            },
+
+            getNextKey: function(key, step) {
+              var curIdx = this.animateQueue.indexOf(key),
+                  nextKey = (curIdx + step) % this.animateQueue.length;
+
+              return this.animateQueue[nextKey];
+            },
+
+            showBullet: function() {
+              this.$bullets.children('li').removeClass('active');
+              this.$bullets.children('li').eq(this.curIdx)
+                                          .addClass('active');
+            },
+
+            updateWidth: function() {
+
+              if ($('body').width() < 1400) {
+                this.cssX = (this.$carousel.parent().width() - 10 - this.$carousel.width() * 0.9) / 2;
+                this.cssXout = 0;
+              }
+
+              if ($('body').width()  >= 1400) {
+                this.cssX = (this.$carousel.parent().width()  - 10 - this.$carousel.width() * 0.9) / 2 * 0.5;
+                this.cssXout = (this.$carousel.parent().width()  - 10 - this.$carousel.width() * 0.7) / 2;
+              }
+
+            },
+
+            getAnimation: function() {
+              var outerLeft, left, right, outerRight;
+
+              center = {
+                'z-index': 3,
+                transform: 'translateX(0) rotateX(0)',
+                visibility: 'visible'
+              };
+              right = {
+                'z-index': 2,
+                transform: 'translateX(' + this.cssX + 'px) translateZ(-300px) rotateY(-25deg)',
+                visibility: 'visible'
+              };
+
+              outerRight = {
+                'z-index': 1,
+                transform: 'translateX(' + this.cssXout + 'px) translateZ(-560px) rotateY(-45deg)',
+                visibility: 'visible'
+              };
+              outerLeft = {
+                'z-index': 1,
+                transform: 'translateX(-' + this.cssXout + 'px) translateZ(-560px) rotateY(45deg)',
+                visibility: 'visible'
+              };
+
+              left = {
+                'z-index': 2,
+                transform: 'translateX(-' + this.cssX + 'px) translateZ(-300px) rotateY(25deg)',
+                visibility: 'visible'
+              };
+
+              return {
+                outerLeft: outerLeft,
+                left: left,
+                center: center,
+                right: right,
+                outerRight: outerRight
+              };
+
+            },
+
+            invisableCss: {
+              'z-index': -1,
+              transform: 'translateX(0) translateZ(-700px) rotateY(0)',
+              visibility:'hidden'
+            }
+
+          };
+
+          var a =new Carousel($('.carousel'));
+
+        </script>
+      </body>
+    </html>
+  </body>
+</html>

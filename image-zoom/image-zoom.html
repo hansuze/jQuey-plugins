@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <title>image-zoom 插件</title>
+    <style>
+      html,
+      body,
+      ul,
+      li {
+        margin: 0;
+        padding: 0;
+      }
+      ul,
+      li {
+        list-style: none;
+      }
+
+      .wrap {
+        margin: 0;
+        margin-top: 10px;
+        margin-left: 10px;
+      }
+
+      .image-zoom {
+        position: relative;
+        display: inline-block;
+      }
+      .image-ct {
+        position: relative;
+        border: 5px solid #ccc;
+      }
+      .image-zoom .show-image {
+        display: block;
+        overflow: hidden;
+
+        width: 300px;
+        height: 300px;
+      }
+
+      .image-zoom .capture {
+        display: none;
+
+        position: absolute;
+        left: 50%;
+        top: 50%;
+
+        border: 1px solid #9e9e9e;
+        width: 100px;
+        height: 100px;
+
+        background: rgba(255, 255, 255, .2);
+
+        cursor: move;
+      }
+
+      .image-zoom .zoom-window {
+        display: none;
+        overflow: hidden;
+
+        position: absolute;
+        left: 310px;
+        top: 5px;
+
+        border: 1px solid #ccc;
+        width: 340px;
+        height: 300px;
+
+        background-repeat: no-repeat;
+
+        transition: .2s background-position;
+      }
+
+      .image-select > li {
+        display: inline-block;
+
+        border: 3px solid #ccc;
+        width: 100px;
+        height: 100px;
+      }
+
+      .image-select > li img {
+        width: 100%;
+        height: 100%;
+      }
+
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="image-zoom">
+        <div class="image-ct">
+        <img class="show-image" src="image/show1.png" data-img="image/show1.png">
+        <span class="capture"></span>
+        </div>
+        <div class="zoom-window"></div>
+      </div>
+      <ul class="image-select">
+        <li><img class="showImg" src="image/show1.png" ></li>
+        <li><img class="showImg" src="image/show2.png" ></li>
+      </ul>
+    </div>
+    <script>
+      var ImageZoom = function($target) {
+        this.init($target);
+        this.bind();
+      };
+
+      ImageZoom.prototype = {
+        init: function($target) {
+          this.$target = $target;
+          this.$imageCt = $target.find('.image-ct');
+          this.$capture = $target.find('.capture'); // 捕捉区域
+          this.$zoomWin = $target.find('.zoom-window');  // 放大区域
+          this.$image = this.$target.find('.show-image'); // 目标图像
+          this.multiple = this.$image.width() / this.$capture.width();
+          this.rectBox = this.getRectBox();
+          this.initZoomWin();
+        },
+
+        bind: function() {
+          var _self = this;
+
+          this.$imageCt.on('mouseenter', function() {
+            _self.show();
+
+          });
+
+          this.$imageCt.on('mouseleave', function() {
+            _self.hide();
+          })
+
+          this.$imageCt.on('mousemove', function(e) {
+            var capPos;
+
+            if (!$(this).attr('image-zoom')) {
+              return;
+            }
+
+            capPos = _self.initCapture(e.pageX, e.pageY);
+            _self.$capture.css({
+              left: capPos.posX,
+              top: capPos.posY
+            });
+            _self.moveCapture();
+          });
+
+        },
+
+        show: function() {
+          this.$imageCt.attr('image-zoom', true);
+          this.$capture.show();
+          this.$zoomWin.show();
+        },
+
+        hide: function() {
+          this.$imageCt.removeAttr('image-zoom');
+          this.$capture.hide();
+          this.$zoomWin.hide();
+        },
+
+        initCapture: function(evtX, evtY) {
+          var capWidth = this.$capture.outerWidth(),
+              capHeight = this.$capture.outerHeight(),
+              imgWidth = this.$image.width(),
+              imgHeight = this.$image.height(),
+              posX = evtX - this.rectBox.left - capWidth / 2,
+              posY = evtY - this.rectBox.top - capHeight / 2;
+
+          if (posX < 0) {
+            posX = 0;
+          }
+
+          if (posX > imgWidth - capWidth) {
+            posX = imgWidth - capWidth;
+          }
+
+          if (posY < 0) {
+            posY = 0;
+          }
+
+          if (posY > imgHeight - capHeight) {
+            posY = imgHeight - capHeight;
+          }
+
+          return {
+            posX: posX,
+            posY: posY
+          };
+        },
+
+        getRectBox: function() {
+          return {
+            left: this.$image.offset().left ,
+            top: this.$image.offset().top ,
+            right: this.$image.offset().left + this.$image.outerWidth(),
+            bottom: this.$image.offset().top + this.$image.outerHeight()
+          };
+
+        },
+
+        initZoomWin: function() {
+          this.$zoomWin.css({
+              'background-image': 'url('+ this.$image.attr('data-img') + ')',
+              'background-size': this.getBgSize().sizeW + ' ' + this.getBgSize().sizeH
+          });
+        },
+
+        moveCapture: function() {
+          this.$zoomWin.css({
+              'background-position': this.getCapPostion().posX +' ' + this.getCapPostion().posY
+          });
+        },
+
+        getCapPostion: function() {
+          return {
+            posX: -this.multiple * this.$capture.css('left').replace('px', '') + 'px',
+            posY: -this.multiple * this.$capture.css('top').replace('px', '') + 'px'
+          };
+        },
+
+        getBgSize: function() {
+          return {
+            sizeW: this.multiple * this.$image.width() + 'px ',
+            sizeH: this.multiple * this.$image.height() + 'px'
+          };
+
+        }
+      };
+
+      var imageZoom = new ImageZoom($('.image-zoom'));
+
+      $('.image-select').on('click', 'li', function() {
+        var imgSrc = $(this).find('img').attr('src');
+
+        $('.image-zoom .show-image')
+                        .attr('src', imgSrc)
+                        .attr('data-img',imgSrc);
+
+        imageZoom.initZoomWin();
+      });
+
+    </script>
+
+  </body>
+</html>

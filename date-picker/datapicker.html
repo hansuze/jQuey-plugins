@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <style>
+      .clearfix::after {
+        display: block;
+
+        height: 0;
+
+        clear:both;
+
+        content: "";
+      }
+
+      .date-picker {
+        padding: 2px;
+        font-size: 16px;
+
+        background: #fff;
+      }
+
+      .date-picker.hidden {
+        display: none;
+       }
+
+      .date-picker .header {
+        display: inline-block;
+
+        box-sizing: border-box;
+        padding: .6em .4em;
+        width: 100%;
+
+        text-align: center;
+        vertical-align: middle;
+
+        background: #CA2B2B;
+      }
+
+      .date-picker .caret-left,
+      .date-picker .caret-right {
+        display: inline-block;
+
+        line-height: 0;
+        width: 0;
+        border: .5em solid transparent;
+      }
+
+      .date-picker .caret-left {
+        float: left;
+
+        border-right-color: #fff;
+      }
+
+      .date-picker .caret-right {
+        float: right;
+
+        border-left-color: #fff;
+      }
+
+      .date-picker .date-ct {
+        border: 1px solid #ccc;
+        border-collapse: collapse;
+      }
+
+      .date-picker .date-ct .cur-date {
+        color: #CA2B2B;
+      }
+
+      .date-picker .date-ct .prev-month,
+      .date-picker .date-ct .next-month {
+        color: #ccc;
+      }
+
+      .date-picker .date-ct th,
+      .date-picker .date-ct td {
+        width: 1.5em;
+
+        text-align: center;
+        vertical-align: center;
+      }
+
+      .date-picker .date-ct th {
+        font-size: 1.1em;
+        line-height: 2;
+      }
+
+      .date-picker .date-ct td {
+        width: 2em;
+
+        line-height: 1.6;
+
+        cursor: pointer;
+      }
+
+      .date-picker .date-ct td:hover,
+      .date-picker .date-ct td:focus{
+        color: #fff;
+        background: #ccc;
+        background-clip: content-box;
+      }
+    </style>
+    <title>日历UI</title>
+  </head>
+  <body>
+    <input class="date-input" type="text">
+    <input class="date-input" type="text" date-init="2016/10/01" value="2016/10/01">
+    <script>
+      var DatePicker = function($target) {
+        this.init($target);
+        this.setTemplate();
+        this.setVal();
+        this.render();
+        this.bind();
+      }
+
+      DatePicker.prototype = {
+        init: function($target) {
+          var input = $target.attr('date-init');
+
+          //解析时考虑到ES5特性 如果"-"形式有前载0就会转化成0时区标准时间，而一般我们计算的结果都是要本地时区时间
+          if (input && input.indexOf("-") != -1) {
+            input=input.replace(/-/g,"/")
+          }
+
+          if (this.isValiateDate(input)) {
+            this.inputDate = new Date(input);
+            this.watchDate =  new Date(input);
+          } else {
+            this.inputDate = new Date();
+            this.watchDate = new Date();
+          }
+
+          this.$target = $target;
+          this.$datePick = null;
+        },
+
+        setTemplate: function() {
+          var _self = this,
+              template = '<div class="date-picker">' +
+                         '<div class="header clearfix">' +
+                         '<a class="prev caret-left" href="javascript:;;"></a>' +
+                         '<span class="cur-month"></span>' +
+                         '<a class="next caret-right" href="javascript:;;"></a>' +
+                         '</div>' +
+                         '<table class="date-ct"></table>' +
+                         '</div>';
+
+          this.$datePick = $(template);
+          this.close();
+          this.$datePick.insertAfter(this.$target) .css({
+            position: 'absolute',
+            left: _self.$target.offset().left,
+            top:  _self.$target.offset().top + _self.$target.outerHeight(true)
+          });
+        },
+
+        setVal: function() {
+          var firstDate = this.getfirstDate(this.watchDate),
+              lastDate =  this.getLastDate(this.watchDate),
+              curYear = firstDate.getFullYear(),
+              curMonth = this.getLeadZero(firstDate.getMonth() + 1),
+              renderArr = [],
+              _self = this;
+
+          this.$datePick.find('.cur-month').text(curYear + '月' + curMonth + '日');
+          renderArr = this.getPrevMonthDate(firstDate).concat(renderArr);
+          for(var num = 1; num <= lastDate.getDate(); num++) {
+            if (this.inputDate.getDate() === num && this.inputDate.getMonth() + 1 === curMonth) {
+              renderArr.push({
+                type: 'cur-date cur-month',
+                data: curYear + '/' + curMonth + '/' + _self.getLeadZero(num),
+                text: _self.getLeadZero(num)
+              });
+            } else {
+              renderArr.push({
+                type: 'cur-month',
+                data: curYear + '/' + curMonth + '/' + _self.getLeadZero(num),
+                text: _self.getLeadZero(num)
+              });
+            }
+
+          }
+
+          renderArr = renderArr.concat(this.getNextMonthDate(lastDate, renderArr));
+          this.renderArr = renderArr;
+
+        },
+
+        render: function() {
+          var col = 7,
+              dateHtml='<tr><th>一</th><th>二</th><th>三</th>' +
+                       '<th>四</th><th>五</th><th>六</th><th>日</th></tr>';
+
+          for(var i = 0; i < this.renderArr.length; i++) {
+              if (i % col === 0) {
+                dateHtml += '<tr>';
+              }
+
+              dateHtml += this.appendTd(this.renderArr[i]);
+
+              if(i % col === 6) {
+                dateHtml += '</tr>';
+              }
+          }
+
+          this.$datePick.find('.date-ct').html('');
+          this.$datePick.find('.date-ct').html(dateHtml);
+        },
+
+        bind: function() {
+          var _self = this;
+
+          this.$datePick.on('click', '.prev', function() {
+            _self.watchDate = _self.getPrevMonth(_self.watchDate);
+            _self.setVal();
+            _self.render();
+            _self.open();
+          });
+
+          this.$datePick.on('click', '.next', function() {
+            _self.watchDate = _self.getNextMonth(_self.watchDate);
+            _self.setVal();
+            _self.render();
+            _self.open();
+          });
+
+          this.$datePick.on('click', '.cur-month', function() {
+            _self.onChange(this);
+            _self.close();
+          });
+
+          this.$datePick.on('click', '.prev-month', function() {
+            _self.$datePick.find('.prev').trigger('click');
+          });
+
+          this.$datePick.on('click', '.next-month', function() {
+            _self.$datePick.find('.prev').trigger('click');
+          });
+
+          this.$target.on('focus', function() {
+            _self.open();
+          });
+
+          this.$target.on('click', function(e) {
+            e.stopPropagation();
+            _self.open();
+          });
+
+          this.$datePick.on('click', function(e) {
+            e.stopPropagation();
+          });
+
+          $(window).on('click', function() {
+            _self.close();
+          });
+
+        },
+        onChange: function(el) {
+          var dateStr = $(el).attr('data');
+
+          this.inputDate = new Date(dateStr);
+          this.$datePick.find('td').removeClass('cur-date');
+          $(el).addClass('cur-date');
+          this.$target.attr('date-init', dateStr).val(dateStr);
+        },
+
+        close: function() {
+          this.$datePick.addClass('hidden');
+        },
+
+        open: function() {
+          this.$datePick.removeClass('hidden');
+        },
+
+        getPrevMonth: function(date) {
+          var year = date.getFullYear(),
+              month = date.getMonth() + 1,
+              dateStr;
+          if (month === 1) {
+            dateStr = (year - 1) + '/' + 12 + '/' + 1;
+          } else {
+            dateStr = year + '/' + (month - 1) + '/' + 1;
+          }
+
+          return new Date(dateStr);
+        },
+
+        getNextMonth: function(date) {
+          var year = date.getFullYear(),
+              month = date.getMonth() + 1,
+              dateStr;
+
+          if(month === 12) {
+            dateStr = (year + 1) + '/' + 1 + '/' + 1;
+          } else {
+            dateStr = year + '/' + (month + 1) + '/' + 1;
+          }
+
+          return new Date(dateStr);
+        },
+
+        // 渲染日期数据
+        appendTd: function(item) {
+          var html = '<td ';
+
+          if (item.type) {
+            html += 'class="' + item.type + '" ';
+          }
+
+          if (item.data) {
+            html += 'data="' + item.data + '"';
+          }
+          html += '>' + item.text + '</td>';
+          return html;
+        },
+
+        // 获取上个月需要渲染的日期数组
+        getPrevMonthDate: function(firstDate) {
+          var prevMonthNum,
+              _self = this,
+              arr = [],
+              addDate = '';
+
+             if (firstDate.getDay() == 1) {
+               prevMonthNum = 7;
+             } else {
+               prevMonthNum = firstDate.getDay() - 1;
+             }
+
+          for (var i = 0; i < prevMonthNum; i++) {
+            addDate = this.getAddDate(firstDate, -(prevMonthNum - i));
+
+            arr.push({
+              type: 'prev-month',
+              data: _self.getYYMMDD(addDate),
+              text: _self.getLeadZero(addDate.getDate())
+            });
+          }
+
+          return arr;
+        },
+
+        // 获取下个月需要渲染的日期数组
+        getNextMonthDate: function(lastDate, renderArr) {
+          var nextMonthNum,
+              _self = this,
+              arr = [],
+              addDate = '';
+
+          nextMonthNum =  42 - renderArr.length;
+
+          for (var i = 0; i < nextMonthNum; i++) {
+            addDate = this.getAddDate(lastDate, i + 1);
+
+            arr.push({
+              type: 'next-month',
+              data: _self.getYYMMDD(addDate),
+              text: _self.getLeadZero(addDate.getDate())
+            });
+          }
+
+          return arr;
+        },
+
+        getAddDate: function(date, num) {
+          return new Date(+date + num * 24 * 60 * 60 * 1000);
+        },
+
+        // 获取当月第一天
+        getfirstDate: function(input) {
+          var date = new Date(input);
+
+          return new Date(date.setDate(1));
+        },
+
+        // 获取当月最后一天
+        getLastDate: function(input) {
+          var date = new Date(input),
+              year = date.getFullYear(),
+              month = date.getMonth() + 1,
+              dateStr = '';
+
+
+          if (month == 12) {
+            dateStr = (year + 1) + '/' + '1' + '/' + '1';
+          } else {
+            dateStr = year + '/' + (month + 1) + '/' + '1';
+          }
+
+          return new Date(+new Date(dateStr) - 24 * 60 * 60 * 1000);
+        },
+
+        getYYMMDD: function(date) {
+          var month = date.getMonth();
+
+          month = this.getLeadZero(month + 1);
+          return date.getFullYear() + '/' + month + '/' + date.getDate();
+        },
+
+        isValiateDate: function(input) {
+          return new Date(input).toString() !== 'Invalid Date';
+        },
+
+        getLeadZero: function(val) {
+          return val.toString().length < 2 ? 0 + val : val;
+        }
+
+      }
+
+      $.fn.datePicker = function() {
+        $(this).each(function() {
+          new DatePicker($(this));
+        });
+
+        return $(this);
+      }
+
+      $('.date-input').datePicker();
+
+    </script>
+  </body>
+</html>

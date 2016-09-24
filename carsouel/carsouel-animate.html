@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <title>自动轮播-animate</title>
+    <style>
+      html,
+      body,
+      ul,
+      li {
+        margin: 0;
+        padding: 0;
+      }
+
+      ul,
+      li {
+        list-style: none;
+      }
+
+      .carousel{
+        overflow: hidden;
+
+        position: relative;
+
+        width: 310px;
+        height: 206px;
+
+        background: #eee;
+      }
+
+      .carousel .img-list{
+        position: relative;
+      }
+
+      .clearfix::after{
+        display: block;
+        clear: both;
+
+        height: 0;
+
+        content: "";
+      }
+
+      .carousel .img-list > li{
+        float: left;
+      }
+
+      .carousel .img-list img{
+        width: 310px;
+        height: 206px;
+      }
+
+      .carousel .arrow{
+        position: absolute;
+        top: 50%;
+
+        border-radius: 20px;
+        width: 30px;
+        height: 30px;
+
+        line-height: 30px;
+        text-align: center;
+        text-decoration: none;
+
+        color: #eee;
+        background-color: #676666;
+
+        box-shadow:0 0 2px #666;
+        opacity: 0.6;
+
+        transform: translateY(-50%);
+        transition: .5s opacity;
+      }
+
+      .carousel .arrow::before {
+        display: block;
+
+        position: absolute;
+        left: -.2em;
+        top: -.2em;
+        right: -.2em;
+        bottom: -.2em;
+        z-index: -1;
+
+        border-radius: 50%;
+
+        content: "";
+      }
+
+      .carousel .arrow:hover {
+        opacity: 1;
+      }
+      .carousel:not([playing="true"]) .arrow:active::before {
+        background: inherit;
+      }
+
+      .carousel .arrow.prev{
+        left: 15px;
+      }
+
+      .carousel .arrow.next{
+        right: 15px;
+      }
+
+      .carousel .bullet{
+        position: absolute;
+        left: 50%;
+        bottom: 20px;
+
+        transform: translateX(-50%);
+
+        cursor: default;
+      }
+
+      .carousel .bullet > li{
+        display: inline-block;
+
+        position: relative;
+
+        border-radius: 2px;
+        height: 5px;
+        width: 20px;
+
+        background-color: #eee;
+
+        cursor: pointer;
+      }
+
+      .carousel .bullet > li::before {
+        display: block;
+
+        position: absolute;
+        left: 0;
+        top: -.6em;
+        right: 0;
+        bottom: -.6em;
+
+        content: "";
+      }
+
+      .bullet > li.active{
+        background-color: #666;
+      }
+     </style>
+  </head>
+  <body>
+    <div class="carousel">
+      <ul class="img-list">
+        <li><a href=""><img src="http://cdn.jirengu.com/book.jirengu.com/img/2.jpg"></a></li>
+        <li><a href=""><img src="http://cdn.jirengu.com/book.jirengu.com/img/3.jpg"></a></li>
+        <li><a href=""><img src="http://cdn.jirengu.com/book.jirengu.com/img/4.jpg"></a></li>
+        <li><a href=""><img src="http://cdn.jirengu.com/book.jirengu.com/img/5.jpg"></a></li>
+      </ul>
+      <a href="javascript:;;;" class="arrow prev"><</a>
+      <a href="javascript:;;;" class="arrow next">></a>
+      <ul class="bullet">
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+      </ul>
+    </div>
+
+    <p>功能描述：</p>
+    <p>1.使用jQuery实现图片的轮播</p>
+    <p>2.自动轮播</p>
+    <p>3.具有自锁功能,避免用户多次点击</p>
+    <p>4.当用户点击前进、后退按钮有效的时候,按钮会反馈用户(按钮变大)</p>
+    <p>5.当用户手动触发轮播的时候,计时器会重新计时</p>
+
+    <script>
+        var CarouselAnimate = function($target) {
+          this.init($target);
+          this.bind();
+          this.show();
+        };
+
+        CarouselAnimate.prototype = {
+          init: function($target) {
+            var $first,
+                $last;
+
+            this.$carousel = $target;
+            this.$lists = $target.find('.img-list');
+            this.imgCount = $target.find('.img-list').children('li').length;
+            this.$prev = $target.find('.prev');
+            this.$next = $target.find('.next');
+            this.$bullets = $target.find('.bullet');
+            this.curIdx = 0;
+            $first = this.$lists.children('li').first();
+            $last = this.$lists.children('li').last();
+            this.imgWidth = $first.width();
+            this.$lists.prepend($last.clone());
+            this.$lists.append($first.clone());
+            this.realCount = this.$lists.children('li').length;
+            this.clock = null;
+            this.timer = 3000;
+            this.$lists.css({
+              width: this.realCount * this.imgWidth,
+              left: 0 - this.imgWidth
+            });
+
+          },
+
+          bind: function() {
+            var _self = this;
+
+            this.$prev.on('click', function() {
+              _self.removeClock(); // 手动点击清除定时器，等到动画执行后再加上
+              _self.playPre();
+            });
+
+            this.$next.on('click', function() {
+              _self.removeClock(); // 手动点击清除定时器，等到动画执行后再加上
+              _self.playNext();
+            });
+
+            this.$bullets.on('click','li', function() {
+              _self.removeClock(); // 手动点击清除定时器，等到动画执行后再加上
+              _self.playIdx($(this).index());
+            });
+          },
+
+          show: function() {
+            this.showBullet();
+            this.autoPlay();
+          },
+
+          showBullet: function() {
+            this.$bullets.children('li').removeClass('active');
+            this.$bullets.children('li').eq(this.curIdx)
+                                        .addClass('active');
+          },
+
+          autoPlay: function() {
+            this.addClock();
+          },
+
+          addClock: function() {
+            var _self = this;
+
+            if (this.clock) {
+              return;
+            }
+
+            this.clock = setInterval(function() {
+              _self.playNext()
+            }, this.timer);
+
+          },
+
+          removeClock: function() {
+            clearInterval(this.clock);
+            this.clock = null;
+          },
+
+          playPre: function(num) {
+            var num = num || 1,
+                _self = this,
+                nextIdx;
+
+            if (this.$carousel.attr('playing')) {
+              return;
+            }
+
+            nextIdx = (this.imgCount + this.curIdx - num) % this.imgCount;
+            this.$carousel.attr('playing', true);
+            this.$lists.animate({
+              left:'+=' + (_self.imgWidth * num)
+            },'normal', function() {
+              if (nextIdx === -1) {
+                _self.$lists.css('left', 0 - _self.imgWidth * _self.imgCount);
+                _self.curIdx = _self.imgCount - 1;
+              } else {
+                _self.curIdx = nextIdx;
+              }
+
+              _self.showBullet();
+              _self.addClock(); // 手动点击清除定时器，等到动画执行后再加上
+              _self.$carousel.removeAttr('playing');
+            });
+
+          },
+
+          playNext: function(num) {
+            var num = num || 1,
+                _self = this,
+                nextIdx;
+
+            if (this.$carousel.attr('playing')) {
+              return;
+            }
+
+            nextIdx = (this.curIdx + num) % this.imgCount;
+            this.$carousel.attr('playing', true);
+            this.$lists.animate({
+              left:'-=' + (this.imgWidth * num)
+            }, 'normal', function() {
+              if (nextIdx === 0) {
+                _self.$lists.css('left', 0 - _self.imgWidth);
+                _self.curIdx = 0;
+              } else {
+                _self.curIdx = nextIdx;
+              }
+
+              _self.showBullet();
+              _self.addClock(); // 手动点击清除定时器，等到动画执行后再加上
+              _self.$carousel.removeAttr('playing');
+            });
+
+          },
+
+          playIdx: function(idx) {
+            var step = idx - this.curIdx;
+
+            if (step > 0) {
+              this.playNext(step);
+            }
+
+            if(step < 0) {
+              this.playPre(0 - step);
+            }
+
+          }
+        };
+
+        $.fn.CarouselAnimate = function() {
+          $(this).each(function() {
+            new CarouselAnimate($(this));
+          });
+
+          return $(this);
+        };
+
+        $('.carousel').CarouselAnimate();
+
+    </script>
+  </body>
+</html>

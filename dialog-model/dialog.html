@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>dialog 插件</title>
+    <style>
+      body {
+        font-family: arial, sans-serif;
+      }
+
+      .button-wrap .btn {
+        font-size: inherit;
+
+        color: #fff;
+        background-color: #f45726;
+
+        outline: 0;
+      }
+
+      .dialog-ct {
+        position: absolute;
+        left: 50%;
+        top: 30%;
+
+        border-radius: 0 0.3em .3em;
+        padding: 0;
+        padding-bottom: .8em;
+        width: 400px;
+
+        background: #eee;
+
+        box-shadow: -.25em 0 .25em -.2em rgba(0, 0, 0, .4),
+                    .25em 0 .25em -.2em rgba(0, 0, 0, .4),
+                    0 .25em .25em -.2em rgba(0, 0, 0, .4);
+
+        transform: translateX(-50%);
+      }
+
+      .dialog-header {
+        padding: .6em .8em;
+
+        color: white;
+        background: #666060;
+      }
+
+      .clearfix {
+
+      }
+
+      .dialog-header .dialog-title {
+        margin: 0;
+        margin-right: 1em;
+        padding: 0;
+
+        text-shadow: 0 -.1em .1em rgba(0, 0, 0, .5);
+      }
+
+      .dialog-header .btn-close {
+        float: right;
+
+        position: relative;
+
+        text-decoration: none;
+
+        color: inherit;
+
+        opacity: .6;
+
+        transition: .5s opacity;
+
+        cursor: pointer;
+      }
+
+      .dialog-header .btn-close::after {
+        display: block;
+
+        position: absolute;
+
+        left: -.6em;
+        top: -.4em;
+        right: -.6em;
+        bottom: -.4em;
+
+        content: "";
+      }
+
+      .dialog-header .btn-close:hover {
+        opacity: 1;
+      }
+
+      .dialog-content {
+        padding: 20px;
+      }
+      .dialog-footer {
+        text-align: center;
+      }
+
+      .btn {
+        display: inline-block;
+
+        border: 1px solid rgba(0, 0, 0, .1);
+        border-radius: .3em;
+        padding: .2em .6em;
+
+        line-height: 120%;
+        text-decoration: none;
+
+        background:linear-gradient(hsla(0, 0%, 100%, 0.2), transparent);
+
+        text-shadow: 0 -.05em .05em rgba(0, 0, 0, .5);
+        box-shadow: 0 .05em .25em rgba(0, 0, 0, .5);
+        cursor: pointer;
+      }
+
+      .dialog-footer .btn {
+        margin: 0;
+        margin-left: 1em;
+        margin-right: 1em;
+        color: #fff;
+        background-color: #f45726;
+      }
+
+      .dialog-ct.troggle {
+        opacity: .9;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="button-wrap">
+      <button class="btn" id="open1">打开1</button>
+      <button class="btn" id="open2">打开2</button>
+      <button class="btn" id="open3">打开3</button>
+      <button class="btn" id="open4">打开4</button>
+      <button class="btn" id="open5">打开5</button>
+      <p>功能描述</p>
+      <p>1.鼠标在 dialog 上左键按下可拖动 dialog</p>
+      <p>2.当点击确定、取消时可使用用户自定义事件</p>
+      <p>3.dialog 可拖动</p>
+      <p>4.使用单例包装 确保只有页面一个dialog</p>
+
+    </div>
+    <script src="http://apps.bdimg.com/libs/jquery/1.9.1/jquery.js"></script>
+    <script>
+    //功能描述：
+    // 1. 可使用 dialog.open() 去打开弹窗
+    // 2. 当点击确定、取消时可使用用户自定义事件
+    // 3. dialog 可拖动
+    // 4. 使用单例包装
+
+    var Dialog = function() {
+        this.creatDialog();
+        this.bindEvent();
+    }
+
+    Dialog.prototype = {
+      defaultOpts: {
+        title:'',
+        message:'',
+        isShowCloseBtn: true,
+        isShowConfirmBtn:false,
+        onClose:function(){},
+        onConfirm:function(){}
+      },
+
+      creatDialog: function(){
+        var html = '';
+
+        html += '<div class="dialog-ct">';
+        html += '<div class="dialog-header">';
+        html += '<a href="javascript:;;;" class="btn-close">X</a>';
+        html += '<h3 class="dialog-title"></h3>';
+        html += '</div>';
+        html += '<div class="dialog-content"></div>';
+        html += '<div class="dialog-footer">';
+        html += '<a href="javascript:;;;" class="btn btn-confirm">确定</a>';
+        html += '<a href="javascript:;;;" class="btn btn-close">取消</a>';
+        html += '</div>';
+        html += '</div>';
+        this.$dialog = $(html).hide();
+        $('body').append(this.$dialog);
+      },
+
+      bindEvent: function(){
+        var _this = this;
+
+        _this.$dialog.find('.btn-confirm').on('click', function(e) {
+          _this.opts.onConfirm.call(_this);
+          _this.$dialog.hide();
+        });
+
+        _this.$dialog.find('.btn-close').on('click', function(e) {
+          _this.opts.onClose.call(_this);
+          _this.$dialog.hide();
+        });
+
+        _this.$dialog.on('mousedown', function(e) {
+          var $dialog = $(this),
+              evtX = e.pageX - $dialog.offset().left;
+              evtY = e.pageY - $dialog.offset().top;
+
+          $dialog.addClass('troggle').data('evtPos', {
+            evtX:evtX,
+            evtY:evtY
+          });
+        });
+
+        $('body').on('mousemove', function(e) {
+            if ($('.troggle').length) {
+              var $troggle = $('.troggle'),
+                  offsetLeft = e.pageX-$troggle.data('evtPos').evtX,
+                  offsetTop = e.pageY-$troggle.data('evtPos').evtY;
+
+              $troggle.offset({
+                left: offsetLeft,
+                top: offsetTop
+              });
+            }
+        });
+
+        $('body').on('mouseup', function() {
+          if ($('.troggle').length) {
+            var $troggle = $('.troggle');
+
+            $troggle.removeClass('troggle').removeData('evtPos');
+          }
+        });
+
+      },
+
+      open: function(opts) {
+        this.setOpts(opts);
+        this.setDialog();
+        this.$dialog.show();
+      },
+
+      setOpts: function(opts){
+        if (typeof opts === 'string') {
+          this.opts = $.extend({}, this.defaultOpts,{message:opts});
+        } else if (typeof opts === 'object') {
+          this.opts = $.extend({}, this.defaultOpts,opts);
+        }
+
+      },
+
+      setDialog: function() {
+        var opts = this.opts;
+            $dialog = this.$dialog;
+
+        if (!opts.title) {
+          $dialog.find('.dialog-header')
+                 .hide();
+        } else {
+          $dialog.find('.dialog-header .dialog-title')
+                 .text(opts.title)
+                 .show();
+        }
+
+        if (!opts.message) {
+          $dialog.find('.dialog-content')
+                 .hide();
+        } else {
+          $dialog.find('.dialog-content')
+                 .html(opts.message)
+                 .show();
+        }
+
+        if (!opts.isShowCloseBtn) {
+          $dialog.find('.dialog-footer .btn-close')
+                 .hide();
+        } else {
+          $dialog.find('.dialog-footer .btn-close')
+                 .show();
+        }
+
+        if (!opts.isShowConfirmBtn) {
+          $dialog.find('.dialog-footer .btn-confirm')
+                 .hide();
+        } else {
+          $dialog.find('.dialog-footer .btn-confirm')
+                 .show();
+        }
+
+      }
+    };
+
+    // 使用单例包装，确保页面只有一个窗口
+    var getSingleton = function() {
+      var instance,
+          Fn = Array.prototype.shift.call(arguments),
+          args = arguments;
+
+      return function() {
+        if (typeof Fn === 'function') {
+          return instance || (instance = new Fn(args));
+        }
+      };
+
+    };
+
+    var singletonDiaglog = getSingleton(Dialog);
+
+    $('#open1').on('click',function(){
+      var dialog = singletonDiaglog();
+
+      dialog.open({
+        message: 'hello,这里是饥人谷',
+        isShowCloseBtn: true,
+      });
+
+    });
+
+    $('#open2').on('click',function(){
+      var dialog = singletonDiaglog();
+
+      dialog.open({
+        message: '<a href="javascript:;;;">饥人谷</a>',
+        isShowCloseBtn: true
+      });
+
+    });
+
+    $('#open3').on('click',function(){
+      var dialog = singletonDiaglog();
+
+      dialog.open({
+        title: '欢迎来到饥人谷',
+        message: 'hello',
+        isShowCloseBtn: true,
+        isShowConfirmBtn: true,
+        onClose: function(){
+          alert('close');
+        },
+        onConfirm: function(){
+          alert('确定');
+        }
+      });
+
+    });
+
+
+    $('#open4').on('click',function(){
+      var tpl = '<ul><li>列表1</li><li>列表2</li><li>列表1</li><li>列表1</li></ul>',
+          dialog = singletonDiaglog();
+
+      dialog.open({
+        title: '欢迎来到饥人谷',
+        message: tpl,
+        isShowCloseBtn: true,
+        isShowConfirmBtn: true,
+        onClose: function(){
+          alert('close');
+        },
+        onConfirm: function(){
+          alert('确定');
+        }
+      });
+
+    });
+
+    $('#open5').on('click',function(){
+      var dialog = singletonDiaglog();
+
+      dialog.open({
+        title: '欢迎来到饥人谷',
+        message: 'hello',
+        isShowCloseBtn: false,
+        isShowConfirmBtn: false,
+      });
+
+    });
+
+    </script>
+  </body>
+</html>

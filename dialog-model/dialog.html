@@ -43,8 +43,13 @@
         background: #666060;
       }
 
-      .clearfix {
+      .clearfix::after {
+        display: block;
+        clear: both;
 
+        height: 0;
+
+        content: "";
       }
 
       .dialog-header .dialog-title {
@@ -166,7 +171,7 @@
         var html = '';
 
         html += '<div class="dialog-ct">';
-        html += '<div class="dialog-header">';
+        html += '<div class="dialog-header clearfix">';
         html += '<a href="javascript:;;;" class="btn-close">X</a>';
         html += '<h3 class="dialog-title"></h3>';
         html += '</div>';
@@ -247,7 +252,7 @@
             $dialog = this.$dialog;
 
         if (!opts.title) {
-          $dialog.find('.dialog-header')
+          $dialog.find('.dialog-header .dialog-title')
                  .hide();
         } else {
           $dialog.find('.dialog-header .dialog-title')
@@ -303,7 +308,7 @@
       var dialog = singletonDiaglog();
 
       dialog.open({
-        message: 'hello,这里是饥人谷',
+        message: 'hello,我是小韩',
         isShowCloseBtn: true,
       });
 
@@ -323,7 +328,7 @@
       var dialog = singletonDiaglog();
 
       dialog.open({
-        title: '欢迎来到饥人谷',
+        title: 'hello xiaohan',
         message: 'hello',
         isShowCloseBtn: true,
         isShowConfirmBtn: true,
@@ -343,7 +348,7 @@
           dialog = singletonDiaglog();
 
       dialog.open({
-        title: '欢迎来到饥人谷',
+        title: 'hello xiaohan',
         message: tpl,
         isShowCloseBtn: true,
         isShowConfirmBtn: true,
@@ -361,7 +366,7 @@
       var dialog = singletonDiaglog();
 
       dialog.open({
-        title: '欢迎来到饥人谷',
+        title: 'hello xiaohan',
         message: 'hello',
         isShowCloseBtn: false,
         isShowConfirmBtn: false,
